@@ -38,8 +38,8 @@ $(function () { //document ready
                 pan_threshold: 0.3, //Precentage of slide width
                 disable_autowidth: false,
                 parent_width: false,
-                swipe_out: false //Enable the swipe out feature - enables swiping items out of the carousel
-
+                swipe_out: false, //Enable the swipe out feature - enables swiping items out of the carousel
+                infinite : true //Enable infinite mode
             };
 
             var settings = $.extend({}, defaults, options);
@@ -48,17 +48,93 @@ $(function () { //document ready
             if (settings.parent_width) {
                 slides.children().width(slides.parent().outerWidth(true)); //resize the slides
             }
-
+            
+            var calculateChildrenWidth = function(parent){
+              var totalWidth = 0;
+            
+              $(slides).children().each(function(){
+                totalWidth += $(this).outerWidth();
+              });
+            
+              return totalWidth;
+            }
 
             var vars = {
                 currentIndex: 0,
                 disable_autowidth: settings.disable_autowidth,
                 parent_width: settings.parent_width,
                 velocity: 0,
-                slideHeight: slides.children().height()
+                slideHeight: slides.children().height(),
+                childrenWidth : calculateChildrenWidth(slides),
+                childrenCount : slides.children().length
             };
+            //duplicate childrens to get 2*parent width
+            
+            
+            //Translates the x or y of an object or returns the x translate value
+            slides.translate3d = function (x, y) {
+                if (x != null) { //Set value
+
+                    this.css('transform', 'translate3d(' + x + 'px' + ',' + (y || 0) + 'px, 0px)');
 
 
+                } else { //Get value
+                    var matrix = matrixToArray(this.css("transform"));
+
+
+                    //Check if jQuery
+                    if ($.fn.jquery != null) { //This happens if has jQuery
+                        return { //Return object with x and y
+                            x: (isExplorer ? parseFloat(matrix[12]) : parseFloat(matrix[4])),
+                            y: (isExplorer ? parseFloat(matrix[13]) : parseFloat(matrix[5]))
+                        };
+                    } else { //This happens if has --Zepto--
+                        var vals = this.css('transform').replace("translate3d", "").replace("(", "").replace(")", "").replace(" ", "").replace("px", "").split(","); //Consider regex instead of tons of replaces
+
+                        return { //Return object with x and y
+                            x: parseFloat(vals[0]),
+                            y: parseFloat(vals[1]) //YESSS Fixed
+                        };
+                    }
+                }
+            }
+            
+            
+            if (settings.infinite){
+              
+              var dup = $(slides).children();
+              //prepend one copy
+              $(slides).prepend(dup.clone());
+              //append one copy
+              $(slides).append(dup.clone());
+              vars.currentIndex = dup.length;
+              settings.start = dup.length;
+              while (calculateChildrenWidth(slides) < 2*$(slides).width()){
+                $(slides).append(dup.clone());
+              }
+              //override translate3d to make it infinite
+              var oldTranslate3d = slides.translate3d;
+              slides.translate3d = function(x,y){
+                if (x != null){
+                  if (x > -vars.childrenWidth){
+                    x -= vars.childrenWidth;
+                    vars.currentIndex += vars.currentIndex <= vars.childrenCount ? vars.childrenCount : 0;
+                  }
+                  if (x < -2*vars.childrenWidth){ 
+                    x += vars.childrenWidth;
+                    vars.currentIndex -= vars.currentIndex >= 2*vars.childrenCount ? vars.childrenCount : 0;
+                  }
+                  console.log("changing active slide to" + vars.currentIndex);
+                  changeActiveSlideTo(vars.currentIndex);
+                  return oldTranslate3d.call($(slides),x,y);
+                }
+                return oldTranslate3d.call($(slides),x,y);
+                
+              }
+              
+            }
+
+            
 
             slides.end_animation = true;
 
@@ -261,7 +337,7 @@ $(function () { //document ready
                         }
 
                         vertical_pan = false;
-
+                        
                         slides.translate3d(
 
                             ((firstTime == 0) ? (savedStartPt - startPointX + (touch.pageX - savedStartPt) / 4) : (touch.pageX - startPointX)) //Check if out of boundaries - if true than add springy panning effect
@@ -361,9 +437,8 @@ $(function () { //document ready
                 slides.mousewheel(function (e) {
                     if (!settings.disable_scroll && !vertical_pan) { //Check if scroll has been disabled
                         e.preventDefault();
-
                         var mouseLandingIndex = vars.currentIndex - (((e.deltaX == 0 ? e.deltaY : e.deltaX) > 0) ? 1 : -1); //Outer sorthand-if is for it to goto next or prev. the inner for touchpad.
-
+                        console.log("mouselanding = " + mouseLandingIndex);
                         if (mouseLandingIndex >= slides.children('li').length || mouseLandingIndex < 0) //If exceeds boundaries dont goto slide
                             return; //Consider in gotoSlide
 
@@ -377,10 +452,9 @@ $(function () { //document ready
 
 
             function changeActiveSlideTo(i) {
-                slides.children(':nth-child(' + ((vars.currentIndex + 1) || 0) + ')').attr('class', '');
-
-                slides.children(':nth-child(' + ((i + 1) || 0) + ')').attr('class', 'itemslide-active'); //Change destination index to active
-
+                slides.children(".itemslide-active").removeClass("itemslide-active");
+                slides.children(':nth-child(' + ((i + 1) || 0) + ')').addClass('itemslide-active'); 
+                
                 if (i != settings.currentIndex) //Check if landingIndex is different from currentIndex
                 {
                     vars.currentIndex = i; //Set current index to landing index
@@ -570,33 +644,7 @@ $(function () { //document ready
         } //END OF INIT ($.fn.itemslide)
 
 
-    //Translates the x or y of an object or returns the x translate value
-    $.fn.translate3d = function (x, y) {
-        if (x != null) { //Set value
-
-            this.css('transform', 'translate3d(' + x + 'px' + ',' + (y || 0) + 'px, 0px)');
-
-
-        } else { //Get value
-            var matrix = matrixToArray(this.css("transform"));
-
-
-            //Check if jQuery
-            if ($.fn.jquery != null) { //This happens if has jQuery
-                return { //Return object with x and y
-                    x: (isExplorer ? parseFloat(matrix[12]) : parseFloat(matrix[4])),
-                    y: (isExplorer ? parseFloat(matrix[13]) : parseFloat(matrix[5]))
-                };
-            } else { //This happens if has --Zepto--
-                var vals = this.css('transform').replace("translate3d", "").replace("(", "").replace(")", "").replace(" ", "").replace("px", "").split(","); //Consider regex instead of tons of replaces
-
-                return { //Return object with x and y
-                    x: parseFloat(vals[0]),
-                    y: parseFloat(vals[1]) //YESSS Fixed
-                };
-            }
-        }
-    }
+    
 });
 
 
