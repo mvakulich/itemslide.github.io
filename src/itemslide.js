@@ -70,11 +70,16 @@ $(function () { //document ready
             };
             //duplicate childrens to get 2*parent width
             
+            var dragging = false;
+            var mouseDown = false;
+            
             
             //Translates the x or y of an object or returns the x translate value
             slides.translate3d = function (x, y) {
                 if (x != null) { //Set value
-
+                    if(mouseDown){
+                      dragging = true;
+                    } 
                     this.css('transform', 'translate3d(' + x + 'px' + ',' + (y || 0) + 'px, 0px)');
 
 
@@ -134,7 +139,14 @@ $(function () { //document ready
               
             }
 
-            
+            slides.find("a").click(function(e){
+              console.log("click");
+              if (dragging){
+                dragging = false;
+                e.preventDefault();
+                return false;
+              }
+            });
 
             slides.end_animation = true;
 
@@ -182,7 +194,7 @@ $(function () { //document ready
 
 
             slides.on('mousedown touchstart', 'li', function (e) {
-
+                mouseDown = true;
                 //Check for touch event or mousemove
                 if (e.type == 'touchstart') {
                     touch = (($.fn.jquery == null) ? e.changedTouches[0] : (e.originalEvent.touches[0] || e.originalEvent.changedTouches[0])); //jQuery for some reason "clones" the event.
@@ -363,10 +375,9 @@ $(function () { //document ready
 
 
             $(window).on('mouseup touchend', /*Pan End*/
-
+                
                 function (e) {
-
-
+                    mouseDown = false;
                     if (isDown) {
 
                         if (e.type == 'touchend') //Check for touch event or mousemove
